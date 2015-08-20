@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014 Mobs & Geeks
+ * Copyright (C) 2015 Mobs & Geeks
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
  * except in compliance with the License. You may obtain a copy of the License at
@@ -12,26 +12,24 @@
  * limitations under the License.
  */
 
-package com.mobsandgeeks.saripaar.annotation;
+package com.mobsandgeeks.saripaar.adapter;
 
-import com.mobsandgeeks.saripaar.rule.DecimalMaxRule;
+import android.view.View;
+import android.widget.RadioGroup;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
+import com.mobsandgeeks.saripaar.exception.ConversionException;
+
 
 /**
+ * Adapter that returns a {@link java.lang.Boolean} value from a {@link android.widget.RadioGroup}.
+ *
  * @author Ragunath Jawahar {@literal <rj@mobsandgeeks.com>}
  * @since 2.0
  */
-@ValidateUsing(DecimalMaxRule.class)
-@Retention(RetentionPolicy.RUNTIME)
-@Target(ElementType.FIELD)
-public @interface DecimalMax {
-    double value();
+public class RadioGroupBooleanAdapter implements ViewDataAdapter<RadioGroup, Boolean> {
 
-    int sequence()      default -1;
-    int messageResId()  default -1;
-    String message()    default "Should be less than max value";
+    @Override
+    public Boolean getData(RadioGroup radioGroup) throws ConversionException {
+        return radioGroup.getCheckedRadioButtonId() != View.NO_ID;
+    }
 }

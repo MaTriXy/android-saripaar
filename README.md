@@ -1,15 +1,11 @@
-Android Saripaar v2 [![Build Status](https://travis-ci.org/ragunathjawahar/android-saripaar.svg?branch=master)](https://travis-ci.org/ragunathjawahar/android-saripaar) [![Android Arsenal](https://img.shields.io/badge/Android%20Arsenal-Android%20Saripaar-brightgreen.svg?style=flat)](http://android-arsenal.com/details/1/526)
+Android Saripaar v2 [![Android Arsenal](https://img.shields.io/badge/Android%20Arsenal-Android%20Saripaar-brightgreen.svg?style=flat)](http://android-arsenal.com/details/1/526)
 ===================
 ![Logo](logo.png)
 
 **சரிபார்** - sari-paar (Tamil for "to check", "verify" or "validate")
 
-Android Saripaar is a simple, yet powerful rule-based UI form validation library for Android.
-It is the **SIMPLEST** and **FEATURE-RICH** validation library available for Android.
-
-*Note: v2 is still under development and is available as snapshots for PREVIEW. For a feature complete
-version of the library, please use v1 (available from Maven Central). The following annotations are
-yet to be implemented in Saripaar v2 `@Future`, `@Past` and `@Digits`*.
+Android Saripaar is a simple, feature-rich and powerful rule-based UI form validation library for Android.
+It is the **SIMPLEST** UI validation library available for Android.
 
 Why Android Saripaar?
 ---------------------
@@ -20,9 +16,8 @@ Why Android Saripaar?
  - **Synchronous** and **Asynchronous** validations, you don't have to worry about threading.
  - Supports both BURST and IMMEDIATE modes.
  - Works with **Stock Android Widgets**, no custom view dependencies.
- - Quick to setup, just download the [jar] and include it in your `libs` project folder.
  - Isolates validation logic using rules.
- - Compatible with other annotation frameworks such as [ButterKnife], [AndroidAnnotations], [RoboGuice], etc.,
+ - Compatible with other annotation-based libraries and frameworks such as [ButterKnife], [AndroidAnnotations], [RoboGuice], etc.,
 
 Quick Start
 -----------
@@ -47,8 +42,9 @@ The annotations are self-explanatory. The `@Order` annotation is required ONLY w
 
 **Step 2 - Instantiate a new [Validator]**
 ```java
-public void onCreate() {
-    super.onCreate();
+@Override
+public void onCreate(Bundle savedInstanceState) {
+    super.onCreate(savedInstanceState);
     // Code…
 
     validator = new Validator(this);
@@ -61,12 +57,16 @@ You will need a `Validator` and a `ValidationListener` for receiving callbacks o
 
 **Step 3 - Implement a [ValidationListener]**
 ```java
-public class RegistrationActivity implements ValidationListener {
+public class RegistrationActivity extends Activity implements ValidationListener {
 
+    // Code…
+
+    @Override
     public void onValidationSucceeded() {
         Toast.makeText(this, "Yay! we got it right!", Toast.LENGTH_SHORT).show();
     }
 
+    @Override
     public void onValidationFailed(List<ValidationError> errors) {
         for (ValidationError error : errors) {
             View view = error.getView();
@@ -80,7 +80,6 @@ public class RegistrationActivity implements ValidationListener {
             }
         }
     }
-
 }
 ```
  - `onValidationSucceeded()` - Called when all your views pass all validations.
@@ -90,6 +89,7 @@ public class RegistrationActivity implements ValidationListener {
 ```java
 registerButton.setOnClickListener(new OnClickListener() {
 
+    @Override
     public void onClick(View v) {
         validator.validate();
     }
@@ -97,18 +97,22 @@ registerButton.setOnClickListener(new OnClickListener() {
 ```
 The `Validator.validate()` call runs the validations and returns the result via appropriate callbacks on the `ValidationListener`. You can run validations on a background `AsyncTask` by calling the `Validator.validate(true)` method.
 
+Saripaar X
+---------------------
+If you are looking for country-specific annotations, checkout the [Saripaar X] project. The extensions project is in its early stages and needs contributors. Feel free to contribute.
+
 Maven
 ---------------------
     <dependency>
         <groupId>com.mobsandgeeks</groupId>
         <artifactId>android-saripaar</artifactId>
-        <version>2.0-SNAPSHOT</version>
+        <version>2.0.2</version>
     </dependency>
 
 Gradle
 ---------------------
     dependencies {
-        compile 'com.mobsandgeeks:android-saripaar:2.0-SNAPSHOT'
+        compile 'com.mobsandgeeks:android-saripaar:2.0.2'
     }
 
 Snapshots
@@ -129,7 +133,11 @@ ProGuard
 Exclude Saripaar classes from obfuscation and minification. Add the following rules to your `proguard-rules.pro` file.
 
     -keep class com.mobsandgeeks.saripaar.** {*;}
-    -keep class commons.validator.routines.** {*;}
+    -keep @com.mobsandgeeks.saripaar.annotation.ValidateUsing class * {*;}
+
+Evolution
+---------------------
+For those interested in finding out how v2 evolved from v1, watch this (~20 second) [video].
 
 Using Saripaar?
 ---------------------
@@ -139,17 +147,7 @@ Icon         | App           | Icon         | App           | Icon         | App
 ------------ | ------------- | ------------ | ------------- | ------------ | -------------
 <img src="https://lh3.ggpht.com/qhpfFQFd5YuLzT5d9jUCI69dMeLlW6XewLsgZ0l06D92M0SmvsMKSMd_YY1Xc9K1GyU=w300-rw" width="48" height="48" /> | [Wikipedia] | <img src="https://lh6.ggpht.com/i_pxbaojay2K2xb2RDC2W7eOnNlpGRgILoACaEDhaKz87JSg3nEJHV3Vz3wmS3L3e4M=w300-rw" width="48" height="48" /> | [Wikipedia Beta] | <img src="https://lh3.ggpht.com/o2lhzbRnq6U1oPxyqY6LDJIc2PO_tm1_sIbX-fMLpG2Sxk94QW2gQaDw8ewam1dPQrdz=w300-rw" width="48" height="48" /> | [Mizuno Baton]
 <img src="https://lh6.ggpht.com/t-WYlpXlwhLL0unTDChiVi24b4LP0kNsJQnRwFaMHd0NGqxgQ2LupQ1Dl7M1ztj8Vg8=w300-rw" width="48" height="48" /> | [Fetch] | <img src="https://lh3.ggpht.com/J3bMDphmzsPFQeMfWR-LH70g5vSGrTVggPzXQdUafKM2KmpWS3THIcSHQaTVbCQ_hjw=w300-rw" width="48" height="48" /> | [HealtheMinder] | <img src="https://lh3.ggpht.com/EhidzByoyUY1OPVcsjOmtOcRwoxphRCy1-a_qKLYKHwsS0DuHIC9cHIDEPLVKO-oTw=w300-rw" width="48" height="48" /> | [MomMe]
-<img src="https://lh5.ggpht.com/h6T-az0ip_OqNtSh__Kc5-0ZPpT7sYxSn4kFPOjrNI7o-LN9bPbovoiYDfswL-B5XQ=w300-rw" width="48" height="48" /> | [Feelknit]
-
-Publications
----------------------
-Cover        | Book         
------------- | -------------
-<img src="http://ecx.images-amazon.com/images/I/416xlob1VeL.jpg" width="48" /> | [Expert Android]
-<img src="http://ecx.images-amazon.com/images/I/417dVd61vKL._BO2,204,203,200_PIsitb-sticker-v3-big,TopRight,0,-55_SX324_SY324_PIkin4,BottomRight,1,22_AA346_SH20_OU03_.jpg" width="48" /> | [Android Top 10 Libraries & Frameworks (German)]
-
-**[AndroidDev Weekly issue #61]** - Open Source Project of the Week<br />
-**[AndroidWeekly issue #65]** - Libraries & Code
+<img src="https://lh5.ggpht.com/h6T-az0ip_OqNtSh__Kc5-0ZPpT7sYxSn4kFPOjrNI7o-LN9bPbovoiYDfswL-B5XQ=w300-rw" width="48" height="48" /> | [Feelknit] | <img src="https://lh4.ggpht.com/k5zFS5VheJKt1yBHKC-wBgJTwOQ4Q_Aa2XbG6Ea_-HvP8nXjYeSnO_227j1wVno1JZY=w300-rw" width="48" height="48" /> | [StreetBarz]
 
 Wiki
 ---------------------
@@ -182,6 +180,8 @@ License
   [Saripaar Annotations]: https://github.com/ragunathjawahar/android-saripaar/tree/master/saripaar/src/main/java/com/mobsandgeeks/saripaar/annotation
   [Validator]: https://github.com/ragunathjawahar/android-saripaar/blob/master/saripaar/src/main/java/com/mobsandgeeks/saripaar/Validator.java
   [ValidationListener]: https://github.com/ragunathjawahar/android-saripaar/blob/master/saripaar/src/main/java/com/mobsandgeeks/saripaar/Validator.java
+  [Saripaar X]: https://github.com/ragunathjawahar/saripaar-x
+  [video]: https://youtu.be/6Os9RxVK76A?t=23
   [Tweet]: https://twitter.com/ragunathjawahar
   [Wikipedia]: https://play.google.com/store/apps/details?id=org.wikipedia
   [Wikipedia Beta]: https://play.google.com/store/apps/details?id=org.wikipedia.beta
@@ -190,8 +190,5 @@ License
   [MomMe]: https://play.google.com/store/apps/details?id=org.harthosp.momme
   [HealtheMinder]: https://play.google.com/store/apps/details?id=org.hartfordhealthcare.healtheminder
   [Feelknit]: https://play.google.com/store/apps/details?id=com.qubittech.feelknit.app
-  [Expert Android]: http://www.apress.com/9781430249504
-  [Android Top 10 Libraries & Frameworks (German)]: http://www.amazon.de/Android-Top10-Libraries-Frameworks-Programmieren-ebook/dp/B00OPXVJ0I/
-  [AndroidDev Weekly issue #61]: http://androiddevweekly.com/2013/06/17/Issue-61.html
-  [AndroidWeekly issue #65]: http://androidweekly.net/issues/issue-65
+  [StreetBarz]: https://play.google.com/store/apps/details?id=com.diofeher.StreetBarz
   [wiki]: https://github.com/ragunathjawahar/android-saripaar/wiki

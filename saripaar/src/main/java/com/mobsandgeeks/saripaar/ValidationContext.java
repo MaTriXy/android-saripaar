@@ -14,8 +14,11 @@
 
 package com.mobsandgeeks.saripaar;
 
+import android.content.Context;
+import android.util.Pair;
 import android.view.View;
 
+import com.mobsandgeeks.saripaar.adapter.ViewDataAdapter;
 import com.mobsandgeeks.saripaar.annotation.ValidateUsing;
 import com.mobsandgeeks.saripaar.exception.ConversionException;
 
@@ -34,9 +37,11 @@ import java.util.Set;
 public class ValidationContext {
 
     // Attributes
-    Map<View, ArrayList<Validator.RuleAdapterPair>> mViewRulesMap;
+    Map<View, ArrayList<Pair<Rule, ViewDataAdapter>>> mViewRulesMap;
+    private Context mContext;
 
-    ValidationContext() {
+    ValidationContext(final Context context) {
+        this.mContext = context;
     }
 
     /**
@@ -52,17 +57,16 @@ public class ValidationContext {
         assertIsRegisteredAnnotation(saripaarAnnotation);
 
         // Get the AnnotationRule class
-
         Class<? extends AnnotationRule> annotationRuleClass = getRuleClass(saripaarAnnotation);
 
         // Find all views with the target rule
         List<View> annotatedViews = new ArrayList<View>();
         Set<View> views = mViewRulesMap.keySet();
         for (View view : views) {
-            ArrayList<Validator.RuleAdapterPair> ruleAdapterPairs = mViewRulesMap.get(view);
-            for (Validator.RuleAdapterPair ruleAdapterPair : ruleAdapterPairs) {
+            ArrayList<Pair<Rule, ViewDataAdapter>> ruleAdapterPairs = mViewRulesMap.get(view);
+            for (Pair<Rule, ViewDataAdapter> ruleAdapterPair : ruleAdapterPairs) {
                 boolean uniqueMatchingView =
-                        annotationRuleClass.equals(ruleAdapterPair.rule.getClass())
+                        annotationRuleClass.equals(ruleAdapterPair.first.getClass())
                                 && !annotatedViews.contains(view);
                 if (uniqueMatchingView) {
                     annotatedViews.add(view);
@@ -87,13 +91,13 @@ public class ValidationContext {
         assertNotNull(saripaarAnnotation, "saripaarAnnotation");
 
         Object data = null;
-        ArrayList<Validator.RuleAdapterPair> ruleAdapterPairs = mViewRulesMap.get(view);
+        ArrayList<Pair<Rule, ViewDataAdapter>> ruleAdapterPairs = mViewRulesMap.get(view);
         Class<? extends AnnotationRule> annotationRuleClass = getRuleClass(saripaarAnnotation);
 
-        for (Validator.RuleAdapterPair ruleAdapterPair : ruleAdapterPairs) {
-            if (annotationRuleClass.equals(ruleAdapterPair.rule.getClass())) {
+        for (Pair<Rule, ViewDataAdapter> ruleAdapterPair : ruleAdapterPairs) {
+            if (annotationRuleClass.equals(ruleAdapterPair.first.getClass())) {
                 try {
-                    data = ruleAdapterPair.dataAdapter.getData(view);
+                    data = ruleAdapterPair.second.getData(view);
                 } catch (ConversionException e) {
                     e.printStackTrace();
                 }
@@ -103,7 +107,16 @@ public class ValidationContext {
         return data;
     }
 
-    void setViewRulesMap(final Map<View, ArrayList<Validator.RuleAdapterPair>> viewRulesMap) {
+    /**
+     * Get a {@link Context}.
+     *
+     * @return A {@link Context}.
+     */
+    public Context getContext() {
+        return mContext;
+    }
+
+    void setViewRulesMap(final Map<View, ArrayList<Pair<Rule, ViewDataAdapter>>> viewRulesMap) {
         mViewRulesMap = viewRulesMap;
     }
 

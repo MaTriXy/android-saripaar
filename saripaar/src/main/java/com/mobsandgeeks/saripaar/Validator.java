@@ -14,16 +14,23 @@
 
 package com.mobsandgeeks.saripaar;
 
+import android.app.Activity;
+import android.app.Fragment;
+import android.content.Context;
 import android.os.AsyncTask;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.Pair;
 import android.view.View;
 import android.widget.CheckBox;
 import android.widget.RadioButton;
+import android.widget.RadioGroup;
 import android.widget.Spinner;
 
 import com.mobsandgeeks.saripaar.adapter.CheckBoxBooleanAdapter;
 import com.mobsandgeeks.saripaar.adapter.RadioButtonBooleanAdapter;
+import com.mobsandgeeks.saripaar.adapter.RadioGroupBooleanAdapter;
 import com.mobsandgeeks.saripaar.adapter.SpinnerIndexAdapter;
 import com.mobsandgeeks.saripaar.adapter.ViewDataAdapter;
 import com.mobsandgeeks.saripaar.annotation.AssertFalse;
@@ -34,19 +41,22 @@ import com.mobsandgeeks.saripaar.annotation.ConfirmPassword;
 import com.mobsandgeeks.saripaar.annotation.CreditCard;
 import com.mobsandgeeks.saripaar.annotation.DecimalMax;
 import com.mobsandgeeks.saripaar.annotation.DecimalMin;
+import com.mobsandgeeks.saripaar.annotation.Digits;
 import com.mobsandgeeks.saripaar.annotation.Domain;
-import com.mobsandgeeks.saripaar.annotation.Order;
-import com.mobsandgeeks.saripaar.annotation.Url;
 import com.mobsandgeeks.saripaar.annotation.Email;
-import com.mobsandgeeks.saripaar.annotation.Isbn;
+import com.mobsandgeeks.saripaar.annotation.Future;
 import com.mobsandgeeks.saripaar.annotation.IpAddress;
+import com.mobsandgeeks.saripaar.annotation.Isbn;
+import com.mobsandgeeks.saripaar.annotation.Length;
 import com.mobsandgeeks.saripaar.annotation.Max;
 import com.mobsandgeeks.saripaar.annotation.Min;
 import com.mobsandgeeks.saripaar.annotation.NotEmpty;
+import com.mobsandgeeks.saripaar.annotation.Order;
 import com.mobsandgeeks.saripaar.annotation.Password;
+import com.mobsandgeeks.saripaar.annotation.Past;
 import com.mobsandgeeks.saripaar.annotation.Pattern;
 import com.mobsandgeeks.saripaar.annotation.Select;
-import com.mobsandgeeks.saripaar.annotation.Size;
+import com.mobsandgeeks.saripaar.annotation.Url;
 import com.mobsandgeeks.saripaar.annotation.ValidateUsing;
 import com.mobsandgeeks.saripaar.exception.ConversionException;
 
@@ -116,21 +126,21 @@ import java.util.Set;
  * @since 1.0
  */
 @SuppressWarnings("unchecked")
-public final class Validator {
+public class Validator {
 
     // Entries are registered inside a static block (Placed at the end of source)
     private static final Registry SARIPAAR_REGISTRY = new Registry();
 
     // Holds adapter entries that are mapped to corresponding views.
-    private static final
-            Map<Class<? extends View>, HashMap<Class<?>, ViewDataAdapter>> REGISTERED_ADAPTERS =
+    private final
+            Map<Class<? extends View>, HashMap<Class<?>, ViewDataAdapter>> mRegisteredAdaptersMap =
                     new HashMap<Class<? extends View>, HashMap<Class<?>, ViewDataAdapter>>();
 
     // Attributes
     private Object mController;
     private Mode mValidationMode;
     private ValidationContext mValidationContext;
-    private Map<View, ArrayList<RuleAdapterPair>> mViewRulesMap;
+    private Map<View, ArrayList<Pair<Rule, ViewDataAdapter>>> mViewRulesMap;
     private boolean mOrderedFields;
     private SequenceComparator mSequenceComparator;
     private ViewValidatedAction mViewValidatedAction;
@@ -148,9 +158,20 @@ public final class Validator {
         assertNotNull(controller, "controller");
         mController = controller;
         mValidationMode = Mode.BURST;
-        mValidationContext = new ValidationContext();
         mSequenceComparator = new SequenceComparator();
         mViewValidatedAction = new DefaultViewValidatedAction();
+
+        // Instantiate a ValidationContext
+        if (controller instanceof Activity) {
+            mValidationContext = new ValidationContext((Activity) controller);
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB
+                && controller instanceof Fragment) {
+            Activity activity = ((Fragment) controller).getActivity();
+            mValidationContext = new ValidationContext(activity);
+        }
+        // Else, lazy init ValidationContext in #getRuleAdapterPair(Annotation, Field)
+        // or void #put(VIEW, QuickRule<VIEW>) by obtaining a Context from one of the
+        // View instances.
     }
 
     /**
@@ -202,15 +223,15 @@ public final class Validator {
      * @param <VIEW>  The {@link android.view.View} type.
      * @param <DATA_TYPE>  The {@link com.mobsandgeeks.saripaar.adapter.ViewDataAdapter} type.
      */
-    public static <VIEW extends View, DATA_TYPE> void registerAdapter(
+    public <VIEW extends View, DATA_TYPE> void registerAdapter(
             final Class<VIEW> viewType, final ViewDataAdapter<VIEW, DATA_TYPE> viewDataAdapter) {
         assertNotNull(viewType, "viewType");
         assertNotNull(viewDataAdapter, "viewDataAdapter");
 
-        HashMap<Class<?>, ViewDataAdapter> dataTypeAdapterMap = REGISTERED_ADAPTERS.get(viewType);
+        HashMap<Class<?>, ViewDataAdapter> dataTypeAdapterMap = mRegisteredAdaptersMap.get(viewType);
         if (dataTypeAdapterMap == null) {
             dataTypeAdapterMap = new HashMap<Class<?>, ViewDataAdapter>();
-            REGISTERED_ADAPTERS.put(viewType, dataTypeAdapterMap);
+            mRegisteredAdaptersMap.put(viewType, dataTypeAdapterMap);
         }
 
         // Find adapter's data type
@@ -391,6 +412,10 @@ public final class Validator {
             throw new IllegalArgumentException("'quickRules' cannot be empty.");
         }
 
+        if (mValidationContext == null) {
+            mValidationContext = new ValidationContext(view.getContext());
+        }
+
         // Create rules
         createRulesSafelyAndLazily(true);
 
@@ -403,14 +428,14 @@ public final class Validator {
         }
 
         // If there are no rules, create an empty list
-        ArrayList<RuleAdapterPair> ruleAdapterPairs = mViewRulesMap.get(view);
+        ArrayList<Pair<Rule, ViewDataAdapter>> ruleAdapterPairs = mViewRulesMap.get(view);
         ruleAdapterPairs = ruleAdapterPairs == null
-                ? new ArrayList<RuleAdapterPair>() : ruleAdapterPairs;
+                ? new ArrayList<Pair<Rule, ViewDataAdapter>>() : ruleAdapterPairs;
 
         // Add the quick rule to existing rules
         for (QuickRule quickRule : quickRules) {
             if (quickRule != null) {
-                ruleAdapterPairs.add(new RuleAdapterPair(quickRule, null));
+                ruleAdapterPairs.add(new Pair(quickRule, null));
             }
         }
         Collections.sort(ruleAdapterPairs, mSequenceComparator);
@@ -533,17 +558,20 @@ public final class Validator {
         return hasOrderAnnotation || hasSaripaarAnnotation;
     }
 
-    private Map<View, ArrayList<RuleAdapterPair>> createRules(final List<Field> annotatedFields) {
+    private Map<View, ArrayList<Pair<Rule, ViewDataAdapter>>> createRules(
+            final List<Field> annotatedFields) {
 
-        final Map<View, ArrayList<RuleAdapterPair>> viewRulesMap =
-                new LinkedHashMap<View, ArrayList<RuleAdapterPair>>();
+        final Map<View, ArrayList<Pair<Rule, ViewDataAdapter>>> viewRulesMap =
+                new LinkedHashMap<View, ArrayList<Pair<Rule, ViewDataAdapter>>>();
 
         for (Field field : annotatedFields) {
-            final ArrayList<RuleAdapterPair> ruleAdapterPairs = new ArrayList<RuleAdapterPair>();
+            final ArrayList<Pair<Rule, ViewDataAdapter>> ruleAdapterPairs =
+                    new ArrayList<Pair<Rule, ViewDataAdapter>>();
             final Annotation[] fieldAnnotations = field.getAnnotations();
             for (Annotation fieldAnnotation : fieldAnnotations) {
                 if (isSaripaarAnnotation(fieldAnnotation.annotationType())) {
-                    RuleAdapterPair ruleAdapterPair = getRuleAdapterPair(fieldAnnotation, field);
+                    Pair<Rule, ViewDataAdapter> ruleAdapterPair =
+                            getRuleAdapterPair(fieldAnnotation, field);
                     ruleAdapterPairs.add(ruleAdapterPair);
                 }
             }
@@ -555,7 +583,7 @@ public final class Validator {
         return viewRulesMap;
     }
 
-    private RuleAdapterPair getRuleAdapterPair(final Annotation saripaarAnnotation,
+    private Pair<Rule, ViewDataAdapter> getRuleAdapterPair(final Annotation saripaarAnnotation,
             final Field viewField) {
         final Class<? extends Annotation> annotationType = saripaarAnnotation.annotationType();
         final Class<?> viewFieldType = viewField.getType();
@@ -577,11 +605,15 @@ public final class Validator {
             throw new UnsupportedOperationException(message);
         }
 
+        if (mValidationContext == null) {
+            mValidationContext = new ValidationContext(getContext(viewField));
+        }
+
         final Class<? extends AnnotationRule> ruleType = getRuleType(saripaarAnnotation);
         final AnnotationRule rule = Reflector.instantiateRule(ruleType,
                 saripaarAnnotation, mValidationContext);
 
-        return new RuleAdapterPair(rule, dataAdapter);
+        return new Pair<Rule, ViewDataAdapter>(rule, dataAdapter);
     }
 
     private ViewDataAdapter getDataAdapter(final Class<? extends Annotation> annotationType,
@@ -594,13 +626,27 @@ public final class Validator {
         // If we are unable to find a Saripaar stock adapter, check the registered adapters
         if (dataAdapter == null) {
             HashMap<Class<?>, ViewDataAdapter> dataTypeAdapterMap =
-                    REGISTERED_ADAPTERS.get(viewFieldType);
+                    mRegisteredAdaptersMap.get(viewFieldType);
             dataAdapter = dataTypeAdapterMap != null
                     ? dataTypeAdapterMap.get(adapterDataType)
                     : null;
         }
 
         return dataAdapter;
+    }
+
+    private Context getContext(final Field viewField) {
+        Context context = null;
+        try {
+            if (!viewField.isAccessible()) {
+                viewField.setAccessible(true);
+            }
+            View view = (View) viewField.get(mController);
+            context = view.getContext();
+        } catch (IllegalAccessException e) {
+            e.printStackTrace();
+        }
+        return context;
     }
 
     private Class<? extends AnnotationRule> getRuleType(final Annotation ruleAnnotation) {
@@ -648,7 +694,7 @@ public final class Validator {
             mAsyncValidationTask = new AsyncValidationTask(view, orderedFields, reasonSuffix);
             mAsyncValidationTask.execute((Void[]) null);
         } else {
-            handleCallbacks(validateTill(view, orderedFields, reasonSuffix));
+            triggerValidationListenerCallback(validateTill(view, orderedFields, reasonSuffix));
         }
     }
 
@@ -666,7 +712,7 @@ public final class Validator {
         return getValidationReport(view, mViewRulesMap, mValidationMode);
     }
 
-    private void handleCallbacks(final ValidationReport validationReport) {
+    private void triggerValidationListenerCallback(final ValidationReport validationReport) {
         final List<ValidationError> validationErrors = validationReport.errors;
 
         if (validationErrors.size() == 0 && !validationReport.hasMoreErrors) {
@@ -678,15 +724,15 @@ public final class Validator {
 
     private void assertOrderedFields(final boolean orderedRules, final String reasonSuffix) {
         if (!orderedRules) {
-            String message = String.format(
-                    "Rules are unordered, all view fields should be ordered "
-                    + "using the '@Order' annotation " + reasonSuffix);
+            String message = "Rules are unordered, all view fields should be ordered "
+                    + "using the '@Order' annotation " + reasonSuffix;
             throw new IllegalStateException(message);
         }
     }
 
     private ValidationReport getValidationReport(final View targetView,
-            final Map<View, ArrayList<RuleAdapterPair>> viewRulesMap, final Mode validationMode) {
+            final Map<View, ArrayList<Pair<Rule, ViewDataAdapter>>> viewRulesMap,
+                    final Mode validationMode) {
 
         final List<ValidationError> validationErrors = new ArrayList<ValidationError>();
         final Set<View> views = viewRulesMap.keySet();
@@ -699,7 +745,7 @@ public final class Validator {
 
         validation:
         for (View view : views) {
-            ArrayList<RuleAdapterPair> ruleAdapterPairs = viewRulesMap.get(view);
+            ArrayList<Pair<Rule, ViewDataAdapter>> ruleAdapterPairs = viewRulesMap.get(view);
             int nRules = ruleAdapterPairs.size();
 
             // Validate all the rules for the given view.
@@ -708,9 +754,9 @@ public final class Validator {
 
                 // Validate only views that are visible and enabled
                 if (view.isShown() && view.isEnabled()) {
-                    RuleAdapterPair ruleAdapterPair = ruleAdapterPairs.get(i);
+                    Pair<Rule, ViewDataAdapter> ruleAdapterPair = ruleAdapterPairs.get(i);
                     Rule failedRule = validateViewWithRule(
-                            view, ruleAdapterPair.rule, ruleAdapterPair.dataAdapter);
+                            view, ruleAdapterPair.first, ruleAdapterPair.second);
                     boolean isLastRuleForView = nRules == i + 1;
 
                     if (failedRule != null) {
@@ -866,26 +912,17 @@ public final class Validator {
     public enum Mode {
 
         /**
-         * BURST mode will validate all rules before calling the
+         * BURST mode will validate all rules in all views before calling the
          * {@link Validator.ValidationListener#onValidationFailed(java.util.List)}
-         * callback.
+         * callback. Ordering and sequencing is optional.
          */
         BURST,
 
         /**
-         * IMMEDIATE mode will stop the validation as soon as it encounters the first failing rule.
+         * IMMEDIATE mode will stop the validation after validating all the rules
+         * of the first failing view. Requires ordered rules, sequencing is optional.
          */
         IMMEDIATE
-    }
-
-    static class RuleAdapterPair {
-        Rule rule;
-        ViewDataAdapter dataAdapter;
-
-        RuleAdapterPair(final Rule rule, final ViewDataAdapter dataAdapter) {
-            this.rule = rule;
-            this.dataAdapter = dataAdapter;
-        }
     }
 
     static class ValidationReport {
@@ -917,7 +954,7 @@ public final class Validator {
 
         @Override
         protected void onPostExecute(final ValidationReport validationReport) {
-            handleCallbacks(validationReport);
+            triggerValidationListenerCallback(validationReport);
         }
     }
 
@@ -926,6 +963,11 @@ public final class Validator {
         SARIPAAR_REGISTRY.register(CheckBox.class, Boolean.class,
                 new CheckBoxBooleanAdapter(),
                 AssertFalse.class, AssertTrue.class, Checked.class);
+
+        // RadioGroupBooleanAdapter
+        SARIPAAR_REGISTRY.register(RadioGroup.class, Boolean.class,
+                new RadioGroupBooleanAdapter(),
+                Checked.class);
 
         // RadioButtonBooleanAdapter
         SARIPAAR_REGISTRY.register(RadioButton.class, Boolean.class,
@@ -946,9 +988,8 @@ public final class Validator {
         // TextViewStringAdapter
         SARIPAAR_REGISTRY.register(
                 ConfirmEmail.class, ConfirmPassword.class, CreditCard.class,
-                Domain.class, Email.class, IpAddress.class, Isbn.class,
-                NotEmpty.class, Password.class, Pattern.class, Size.class,
-                Url.class);
-//            Digits.class, Future.class, Past.class
+                Digits.class, Domain.class, Email.class, Future.class,
+                IpAddress.class, Isbn.class, Length.class, NotEmpty.class,
+                Password.class, Past.class, Pattern.class, Url.class);
     }
 }

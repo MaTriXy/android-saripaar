@@ -14,7 +14,7 @@
 
 package com.mobsandgeeks.saripaar.annotation;
 
-import com.mobsandgeeks.saripaar.rule.SizeRule;
+import com.mobsandgeeks.saripaar.rule.LengthRule;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -25,15 +25,15 @@ import java.lang.annotation.Target;
  * @author Ragunath Jawahar {@literal <rj@mobsandgeeks.com>}
  * @since 2.0
  */
-@ValidateUsing(SizeRule.class)
+@ValidateUsing(LengthRule.class)
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.FIELD)
-public @interface Size {
-    public int min()            default Integer.MIN_VALUE;
-    public int max()            default Integer.MAX_VALUE;
-    public boolean trim()       default false;
+public @interface Length {
+    int min()           default Integer.MIN_VALUE;
+    int max()           default Integer.MAX_VALUE;
+    boolean trim()      default false;
 
-    public int sequence()       default -1;
-    public int messageResId()   default -1;
-    public String message()     default "Invalid length";
+    int sequence()      default -1;
+    int messageResId()  default -1;
+    String message()    default "Invalid length";
 }

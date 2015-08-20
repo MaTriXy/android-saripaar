@@ -28,7 +28,11 @@ public class DigitsRule extends AnnotationRule<Digits, String> {
     }
 
     @Override
-    public boolean isValid(final String data) {
-        return false;
+    public boolean isValid(final String digits) {
+        int integer = mRuleAnnotation.integer();
+        int fraction = mRuleAnnotation.fraction();
+
+        String digitsRegex = String.format("(\\d{0,%d})(\\.\\d{1,%d})?", integer, fraction);
+        return digits.matches(digitsRegex);
     }
 }
