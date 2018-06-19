@@ -14,6 +14,8 @@
 
 package com.mobsandgeeks.saripaar.annotation;
 
+import android.support.annotation.StringRes;
+
 import com.mobsandgeeks.saripaar.rule.PatternRule;
 
 import java.lang.annotation.ElementType;
@@ -29,10 +31,11 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.FIELD)
 public @interface Pattern {
-    String regex();
-    boolean caseSensitive() default true;
+    @StringRes int regexResId()     default -1;
+    String regex()                  default ".*";
+    boolean caseSensitive()         default true;
 
-    int sequence()          default -1;
-    int messageResId()      default -1;
-    String message()        default "Input does not match pattern";
+    @StringRes int messageResId()   default -1;
+    String message()                default "Input does not match pattern";
+    int sequence()                  default -1;
 }

@@ -12,26 +12,18 @@
  * limitations under the License.
  */
 
-package com.mobsandgeeks.saripaar.rule;
+package com.mobsandgeeks.saripaar.annotation;
 
-import com.mobsandgeeks.saripaar.ValidationContext;
-import com.mobsandgeeks.saripaar.annotation.ConfirmPassword;
-import com.mobsandgeeks.saripaar.annotation.Password;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
 /**
  * @author Ragunath Jawahar {@literal <rj@mobsandgeeks.com>}
- * @since 2.0
+ * @since 2.1.0
  */
-public class ConfirmPasswordRule
-        extends SameValueContextualRule<ConfirmPassword, Password, String> {
-
-    protected ConfirmPasswordRule(final ConfirmPassword confirmPassword,
-            final ValidationContext validationContext) {
-        super(confirmPassword, Password.class, validationContext);
-    }
-
-    @Override
-    public boolean isValid(final String confirmValue) {
-        return super.isValid(confirmValue);
-    }
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.FIELD)
+public @interface Optional {
 }

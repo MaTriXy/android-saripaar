@@ -51,6 +51,7 @@ import com.mobsandgeeks.saripaar.annotation.Length;
 import com.mobsandgeeks.saripaar.annotation.Max;
 import com.mobsandgeeks.saripaar.annotation.Min;
 import com.mobsandgeeks.saripaar.annotation.NotEmpty;
+import com.mobsandgeeks.saripaar.annotation.Optional;
 import com.mobsandgeeks.saripaar.annotation.Order;
 import com.mobsandgeeks.saripaar.annotation.Password;
 import com.mobsandgeeks.saripaar.annotation.Past;
@@ -125,7 +126,7 @@ import java.util.Set;
  * @author Ragunath Jawahar {@literal <rj@mobsandgeeks.com>}
  * @since 1.0
  */
-@SuppressWarnings("unchecked")
+@SuppressWarnings({ "unchecked", "ForLoopReplaceableByForEach" })
 public class Validator {
 
     // Entries are registered inside a static block (Placed at the end of source)
@@ -141,7 +142,9 @@ public class Validator {
     private Mode mValidationMode;
     private ValidationContext mValidationContext;
     private Map<View, ArrayList<Pair<Rule, ViewDataAdapter>>> mViewRulesMap;
+    private Map<View, ArrayList<Pair<Annotation, ViewDataAdapter>>> mOptionalViewsMap;
     private boolean mOrderedFields;
+    private boolean mValidateInvisibleViews;
     private SequenceComparator mSequenceComparator;
     private ViewValidatedAction mViewValidatedAction;
     private Handler mViewValidatedActionHandler;
@@ -283,6 +286,15 @@ public class Validator {
      */
     public Mode getValidationMode() {
         return mValidationMode;
+    }
+
+    /**
+     * Configures the validator to validate invisible views.
+     *
+     * @param validate  {@code true} includes invisible views during validation.
+     */
+    public void validateInvisibleViews(final boolean validate) {
+        this.mValidateInvisibleViews = validate;
     }
 
     /**
@@ -433,7 +445,8 @@ public class Validator {
                 ? new ArrayList<Pair<Rule, ViewDataAdapter>>() : ruleAdapterPairs;
 
         // Add the quick rule to existing rules
-        for (QuickRule quickRule : quickRules) {
+        for (int i = 0, n = quickRules.length; i < n; i++) {
+            QuickRule quickRule = quickRules[i];
             if (quickRule != null) {
                 ruleAdapterPairs.add(new Pair(quickRule, null));
             }
@@ -493,7 +506,8 @@ public class Validator {
 
         List<Field> annotatedFields = new ArrayList<Field>();
         List<Field> controllerViewFields = getControllerViewFields(controllerClass);
-        for (Field field : controllerViewFields) {
+        for (int i = 0, n = controllerViewFields.size(); i < n; i++) {
+            Field field = controllerViewFields.get(i);
             if (isSaripaarAnnotatedField(field, saripaarAnnotations)) {
                 annotatedFields.add(field);
             }
@@ -531,7 +545,8 @@ public class Validator {
     private List<Field> getViewFields(final Class<?> clazz) {
         List<Field> viewFields = new ArrayList<Field>();
         Field[] declaredFields = clazz.getDeclaredFields();
-        for (Field field : declaredFields) {
+        for (int i = 0, n = declaredFields.length; i < n; i++) {
+            Field field = declaredFields[i];
             if (View.class.isAssignableFrom(field.getType())) {
                 viewFields.add(field);
             }
@@ -547,7 +562,8 @@ public class Validator {
 
         if (!hasOrderAnnotation) {
             Annotation[] annotations = field.getAnnotations();
-            for (Annotation annotation : annotations) {
+            for (int i = 0, n = annotations.length; i < n; i++) {
+                Annotation annotation = annotations[i];
                 hasSaripaarAnnotation = registeredAnnotations.contains(annotation.annotationType());
                 if (hasSaripaarAnnotation) {
                     break;
@@ -564,23 +580,57 @@ public class Validator {
         final Map<View, ArrayList<Pair<Rule, ViewDataAdapter>>> viewRulesMap =
                 new LinkedHashMap<View, ArrayList<Pair<Rule, ViewDataAdapter>>>();
 
-        for (Field field : annotatedFields) {
+        View view;
+        for (int i = 0, n = annotatedFields.size(); i < n; i++) {
+            Field field = annotatedFields.get(i);
             final ArrayList<Pair<Rule, ViewDataAdapter>> ruleAdapterPairs =
                     new ArrayList<Pair<Rule, ViewDataAdapter>>();
             final Annotation[] fieldAnnotations = field.getAnnotations();
-            for (Annotation fieldAnnotation : fieldAnnotations) {
-                if (isSaripaarAnnotation(fieldAnnotation.annotationType())) {
+
+            // @Optional
+            final boolean hasOptionalAnnotation = hasOptionalAnnotation(fieldAnnotations);
+            if (hasOptionalAnnotation && mOptionalViewsMap == null) {
+                mOptionalViewsMap = new HashMap<View,
+                        ArrayList<Pair<Annotation, ViewDataAdapter>>>();
+            }
+
+            view = getView(field);
+            for (int j = 0, nAnnotations = fieldAnnotations.length; j < nAnnotations; j++) {
+                Annotation annotation = fieldAnnotations[j];
+                if (isSaripaarAnnotation(annotation.annotationType())) {
                     Pair<Rule, ViewDataAdapter> ruleAdapterPair =
-                            getRuleAdapterPair(fieldAnnotation, field);
+                            getRuleAdapterPair(annotation, field);
                     ruleAdapterPairs.add(ruleAdapterPair);
+
+                    // @Optional
+                    if (hasOptionalAnnotation) {
+                        ArrayList<Pair<Annotation, ViewDataAdapter>> pairs =
+                                mOptionalViewsMap.get(view);
+                        if (pairs == null) {
+                            pairs = new ArrayList<Pair<Annotation, ViewDataAdapter>>();
+                        }
+                        pairs.add(new Pair(annotation, ruleAdapterPair.second));
+                        mOptionalViewsMap.put(view, pairs);
+                    }
                 }
             }
 
             Collections.sort(ruleAdapterPairs, mSequenceComparator);
-            viewRulesMap.put(getView(field), ruleAdapterPairs);
+            viewRulesMap.put(view, ruleAdapterPairs);
         }
 
         return viewRulesMap;
+    }
+
+    private boolean hasOptionalAnnotation(final Annotation[] annotations) {
+        if (annotations != null && annotations.length > 0) {
+            for (int i = 0, n = annotations.length; i < n; i++) {
+                if (Optional.class.equals(annotations[i].annotationType())) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private Pair<Rule, ViewDataAdapter> getRuleAdapterPair(final Annotation saripaarAnnotation,
@@ -745,40 +795,49 @@ public class Validator {
 
         validation:
         for (View view : views) {
-            ArrayList<Pair<Rule, ViewDataAdapter>> ruleAdapterPairs = viewRulesMap.get(view);
-            int nRules = ruleAdapterPairs.size();
+            List<Pair<Rule, ViewDataAdapter>> ruleAdapterPairs = viewRulesMap.get(view);
+
+            // @Optional
+            boolean isOptional = mOptionalViewsMap != null && mOptionalViewsMap.containsKey(view);
+            if (isOptional && containsOptionalValue(view)) {
+                continue;
+            }
 
             // Validate all the rules for the given view.
             List<Rule> failedRules = null;
-            for (int i = 0; i < nRules; i++) {
+            for (int i = 0, nRules = ruleAdapterPairs.size(); i < nRules; i++) {
 
-                // Validate only views that are visible and enabled
-                if (view.isShown() && view.isEnabled()) {
-                    Pair<Rule, ViewDataAdapter> ruleAdapterPair = ruleAdapterPairs.get(i);
-                    Rule failedRule = validateViewWithRule(
-                            view, ruleAdapterPair.first, ruleAdapterPair.second);
-                    boolean isLastRuleForView = nRules == i + 1;
+                // Skip views that are invisible and disabled
+                boolean disabledView = !view.isEnabled();
+                boolean skipView = !view.isShown() && !mValidateInvisibleViews;
+                if (disabledView || skipView) {
+                    continue;
+                }
 
-                    if (failedRule != null) {
-                        if (addErrorToReport) {
-                            if (failedRules == null) {
-                                failedRules = new ArrayList<Rule>();
-                                validationErrors.add(new ValidationError(view, failedRules));
-                            }
-                            failedRules.add(failedRule);
-                        } else {
-                            hasMoreErrors = true;
+                Pair<Rule, ViewDataAdapter> ruleAdapterPair = ruleAdapterPairs.get(i);
+                Rule failedRule = validateViewWithRule(
+                        view, ruleAdapterPair.first, ruleAdapterPair.second);
+                boolean isLastRuleForView = i + 1 == nRules;
+
+                if (failedRule != null) {
+                    if (addErrorToReport) {
+                        if (failedRules == null) {
+                            failedRules = new ArrayList<Rule>();
+                            validationErrors.add(new ValidationError(view, failedRules));
                         }
-
-                        if (Mode.IMMEDIATE.equals(validationMode) && isLastRuleForView) {
-                            break validation;
-                        }
+                        failedRules.add(failedRule);
+                    } else {
+                        hasMoreErrors = true;
                     }
 
-                    // Don't add reports for subsequent views
-                    if (view.equals(targetView) && isLastRuleForView) {
-                        addErrorToReport = false;
+                    if (Mode.IMMEDIATE.equals(validationMode) && isLastRuleForView) {
+                        break validation;
                     }
+                }
+
+                // Don't add reports for subsequent views
+                if (view.equals(targetView) && isLastRuleForView) {
+                    addErrorToReport = false;
                 }
             }
 
@@ -791,6 +850,23 @@ public class Validator {
         }
 
         return new ValidationReport(validationErrors, hasMoreErrors);
+    }
+
+    private boolean containsOptionalValue(final View view) {
+        ArrayList<Pair<Annotation, ViewDataAdapter>> annotationAdapterPairs
+                = mOptionalViewsMap.get(view);
+
+        for (int i = 0, n = annotationAdapterPairs.size(); i < n; i++) {
+            Pair<Annotation, ViewDataAdapter> pair = annotationAdapterPairs.get(i);
+            ViewDataAdapter adapter = pair.second;
+            Annotation ruleAnnotation = pair.first;
+
+            if (adapter.containsOptionalValue(view, ruleAnnotation)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private Rule validateViewWithRule(final View view, final Rule rule,
@@ -850,10 +926,9 @@ public class Validator {
     private View getViewBefore(final View view) {
         ArrayList<View> views = new ArrayList<View>(mViewRulesMap.keySet());
 
-        final int nViews = views.size();
         View currentView;
         View previousView = null;
-        for (int i = 0; i < nViews; i++) {
+        for (int i = 0, n = views.size(); i < n; i++) {
             currentView = views.get(i);
             if (currentView == view) {
                 previousView = i > 0 ? views.get(i - 1) : null;
@@ -935,12 +1010,12 @@ public class Validator {
         }
     }
 
-    class AsyncValidationTask extends AsyncTask<Void, Void, ValidationReport> {
+    private class AsyncValidationTask extends AsyncTask<Void, Void, ValidationReport> {
         private View mView;
         private boolean mOrderedRules;
         private String mReasonSuffix;
 
-        public AsyncValidationTask(final View view, final boolean orderedRules,
+        AsyncValidationTask(final View view, final boolean orderedRules,
                 final String reasonSuffix) {
             this.mView = view;
             this.mOrderedRules = orderedRules;

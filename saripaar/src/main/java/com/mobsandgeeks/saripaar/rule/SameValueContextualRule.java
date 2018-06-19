@@ -36,11 +36,11 @@ class SameValueContextualRule<CONFIRM extends Annotation, SOURCE extends Annotat
     private Class<SOURCE> mSourceClass;
     private Class<CONFIRM> mConfirmClass;
 
-    protected SameValueContextualRule(final ValidationContext validationContext,
-            final CONFIRM confirmAnnotation, final Class<SOURCE> sourceClass) {
-        super(validationContext, confirmAnnotation);
-        mSourceClass = sourceClass;
+    protected SameValueContextualRule(final CONFIRM confirmAnnotation,
+            final Class<SOURCE> sourceClass, final ValidationContext validationContext) {
+        super(confirmAnnotation, validationContext);
         mConfirmClass = (Class<CONFIRM>) confirmAnnotation.annotationType();
+        mSourceClass = sourceClass;
     }
 
     @Override
