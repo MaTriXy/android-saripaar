@@ -17,6 +17,8 @@ package com.mobsandgeeks.saripaar.rule;
 import com.mobsandgeeks.saripaar.AnnotationRule;
 import com.mobsandgeeks.saripaar.annotation.Digits;
 
+import java.util.Locale;
+
 /**
  * @author Ragunath Jawahar {@literal <rj@mobsandgeeks.com>}
  * @since 2.0
@@ -32,7 +34,7 @@ public class DigitsRule extends AnnotationRule<Digits, String> {
         int integer = mRuleAnnotation.integer();
         int fraction = mRuleAnnotation.fraction();
 
-        String digitsRegex = String.format("(\\d{0,%d})(\\.\\d{1,%d})?", integer, fraction);
+        String digitsRegex = String.format(Locale.US, "(\\d{0,%d})(\\.\\d{1,%d})?", integer, fraction);
         return digits.matches(digitsRegex);
     }
 }
